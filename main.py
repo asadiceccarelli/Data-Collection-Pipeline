@@ -26,8 +26,9 @@ class Scraper:
     #     Prints the animals name and what sound it makes
     """
     '''
-    def __init__(self, driver, URL, pause_time):
+    def __init__(self, driver, club, URL, pause_time):
         self.driver = driver
+        self.club = club.capitalize()
         self.URL = URL
         self.pause_time = pause_time
 
@@ -62,8 +63,8 @@ class Scraper:
         '''Retrieves the href links to each match and stores them in a list.'''
         sleep(self.pause_time)
         fixture_list = self.driver.find_element(By.XPATH, '//section[@class="fixtures"]')
-        home_games = fixture_list.find_elements(By.XPATH, '//li[@data-home="Chelsea"]')
-        away_games = fixture_list.find_elements(By.XPATH, '//li[@data-away="Chelsea"]')
+        home_games = fixture_list.find_elements(By.XPATH, f'//li[@data-home="{self.club}"]')
+        away_games = fixture_list.find_elements(By.XPATH, f'//li[@data-away="{self.club}"]')
         link_list = []
         for game in home_games:
             link_class = game.find_element(By.XPATH, "./div")
@@ -86,7 +87,7 @@ class Scraper:
         score_container = self.driver.find_element(By.XPATH, '//div[@class="scoreboxContainer"]')
         home_container = score_container.find_element(By.XPATH, '//div[contains(@class, "team home")]')
         home_team = home_container.find_element(By.CSS_SELECTOR, 'span.long').text
-        if home_team == 'Chelsea':
+        if home_team == f'{self.club}':
             return 'Home'
         else:
             return 'Away'
@@ -221,7 +222,7 @@ class Scraper:
 
     
     def save_data(self, match_id, raw_stats):
-        path = f'/Users/asadiceccarelli/Documents/AiCore/Data-Collection-Pipeline/raw_data/{match_id}'
+        path = f'/Users/asadiceccarelli/Documents/AiCore/Data-Collection-Pipeline/raw_data/{self.club}/{match_id}'
         if not os.path.exists(path):
             os.makedirs(path)
         json_str = json.dumps(raw_stats)
@@ -269,6 +270,7 @@ class Scraper:
 
 if __name__ == '__main__':
     premierleague = Scraper(driver=webdriver.Chrome(),
+                            club = 'Arsenal',
                             URL='https://www.premierleague.com/results?co=1&se=418&cl=-1',
                             pause_time=1)
     premierleague.run_crawler()
