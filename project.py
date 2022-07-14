@@ -1,10 +1,14 @@
 import os
 import uuid
 import json
+import boto3
 from time import sleep
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
+# Headless mode
 
 class PremierLeagueScraper:
     '''
@@ -15,56 +19,39 @@ class PremierLeagueScraper:
     driver (class): The webdriver to be used.
     club (str): The Premier League club to be inspected.
     URL (str): The URL of the 2021/22 results page from the official Premier League website.
-    pause_time (int): The time in seconds the program will pause for between actions.
     '''
-    def __init__(self, driver, club, URL, pause_time):
+    def __init__(self, driver, club):
         self.driver = driver
         self.club = club.capitalize()
-        self.URL = URL
-        self.pause_time = pause_time
-
-    def open_page(self, link):
-        '''
-        Opens a new web page on the URL of the link given.
-
-        Args:
-            link (str): The link to be opened.
-        '''
-        self.driver.get(link)
+        self.URL = 'https://www.premierleague.com/results?co=1&se=418&cl=-1'
+        self.driver.implicitly_wait(5)
 
     def accept_cookies(self):
-        '''Accepts all cookies if cookie window appears. Does nothing if no window.'''
-        sleep(self.pause_time+2)
+        '''Wait for window and accepts all cookies. Does nothing if no window.'''
         try:
-            accept_cookies_button = self.driver.find_element(By. XPATH,
-                '//*[@class="_2hTJ5th4dIYlveipSEMYHH BfdVlAo_cgSVjDUegen0F js-accept-all-close"]')
+            accept_cookies_button = WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.XPATH,
+                '//*[@class="_2hTJ5th4dIYlveipSEMYHH BfdVlAo_cgSVjDUegen0F js-accept-all-close"]')))
             accept_cookies_button.click()
         except:
-            pass # If there are no cookies
+            pass # If there are no cookies.
 
     def close_ad(self):
         '''Closes ad if window appears. Does nothing if no ad.'''
-        sleep(self.pause_time+1)
         try:
             close_ad_button = self.driver.find_element(By. XPATH, '//*[@class="closeBtn"]')
             close_ad_button.click()
         except:
-            pass # If there are no cookies
+            pass # If there is no ad.
 
-    def scroll_to_bottom(self): 
-        '''Scrolls to bottom of the page 1/8 at a time, starting halfway down, to ensure all fixtures loaded.'''
-        sleep(self.pause_time)
+    def scroll_to_bottom(self): # C.presence_of_element_located
+        '''Scrolls to 14/15ths of the way down the page, multiple times, to ensure all fixtures loaded.'''
+        sleep(2)
         self.close_ad()
-        current_height = self.driver.execute_script('return document.body.scrollHeight')
-        new_height = None
-        while current_height != new_height:
-            for i in range(5,9):
-                sleep(self.pause_time)
-                self.driver.execute_script(f"window.scrollTo(0,document.body.scrollHeight*{i}/8)")
-            new_height = self.driver.execute_script('return document.body.scrollHeight')
-            if new_height == current_height:
-                break
-            current_height = new_height
+        i = 0
+        while i < 5:
+            self.driver.execute_script(f"window.scrollTo(0,document.body.scrollHeight*14/15)")
+            sleep(2)
+            i += 1
 
     def get_fixture_link_list(self):
         '''
@@ -76,7 +63,6 @@ class PremierLeagueScraper:
         link_list = []
         while len(link_list) != 38:
             link_list = []
-            sleep(self.pause_time)
             fixture_list = self.driver.find_element(By.XPATH, '//section[@class="fixtures"]')
             home_games = fixture_list.find_elements(By.XPATH, f'//li[@data-home="{self.club}"]')
             away_games = fixture_list.find_elements(By.XPATH, f'//li[@data-away="{self.club}"]')
@@ -88,7 +74,9 @@ class PremierLeagueScraper:
             if len(link_list) != 38:
                 print(f'ERROR: {len(link_list)} fixtures in list. There should be 38.')
                 self.driver.refresh()
-                sleep(self.pause_time+4)
+                sleep(5)
+                self.close_ad()
+                sleep(1)
                 self.scroll_to_bottom()
             else:
                 print('All 38 fixtures in list.')
@@ -119,57 +107,26 @@ class PremierLeagueScraper:
         score = self.driver.find_element(By.XPATH, '//div[@class="score fullTime"]').text # 'home_score - away_score'
         home_score = int(score[0])
         away_score = int(score[2])
-        if home_or_away == 'Home' and home_score > away_score:
-            return [home_score, away_score, 'Win']
-        elif home_or_away == 'Away' and away_score > home_score:
+        if (home_or_away == 'Home' and home_score > away_score) or (home_or_away == 'Away' and away_score > home_score):
             return [home_score, away_score, 'Win']
         elif home_score == away_score:
             return [home_score, away_score, 'Draw']
         else:
             return [home_score, away_score, 'Loss']
-
-    def click_stats(self):
-        '''Clicks on the stats tab to reveal the page containing the statistics information.'''
-        sleep(self.pause_time)
-        stats_tab = self.driver.find_element(By.XPATH, '//li[@data-tab-index="2"]')
-        stats_tab.click()
     
-    def get_match_location(self):
+    def get_match_info(self):
         '''
-        Extracts the name and location of the stadium played at.
+        Extracts the date, name and location of the stadium played at and statistics from the stats page.
 
         Returns:
-            str
+            list: Date in datetime format (%a %d %b %Y) as a string, stadium as a string, stats_list as a list.
         '''
-        try:
-            stadium = self.driver.find_element(By.XPATH, '//div[@class="stadium"]')
-            return stadium.text
-        except:
-            return 'N/A'
-
-    def get_match_date(self):
-        '''
-        Returns the date of the fixture in datetime.
-        
-        Returns:
-            str: Date in datetime format (%a %d %b %Y) as a string.
-        '''
-        try:
-            date_str = self.driver.find_element(By.XPATH, '//div[@class="matchDate renderMatchDateContainer"]').text
-            return(date_str)
-        except:
-            return 'N/A'
-
-    def get_stats(self):
-        '''
-        Gets all the stats from the match inspected.
-        
-        Returns:
-            list: Each element conatins the home and away stats for each category, separated by the name of the category.
-        '''
-        sleep(self.pause_time)
+        date_str = self.driver.find_element(By.XPATH, '//div[@class="matchDate renderMatchDateContainer"]').text
+        stadium = self.driver.find_element(By.XPATH, '//div[@class="stadium"]').text
         stats_table = self.driver.find_element(By.XPATH, '//tbody[@class="matchCentreStatsContainer"]')
-        return stats_table.find_elements(By.TAG_NAME, 'tr')
+        stats_list = stats_table.find_elements(By.TAG_NAME, 'tr')
+        info = [date_str, stadium, stats_list]
+        return info
 
     def split_stats_list(self, stats_list):
         '''
@@ -179,48 +136,28 @@ class PremierLeagueScraper:
             stats_list (list): The list of all match statistics of both teams.
 
         Returns:
-            list: [
-                Possession,
-                Shots on target,
-                Shots,
-                Touches,
-                Passes,
-                Tackles,
-                Clearances,
-                Corners,
-                Offsides,
-                Fouls conceded (if any),
-                Yellow cards (if any),
-                Red cards (if any)
-                ]
+            # list: [
+            #     Possession,
+            #     Shots on target,
+            #     Shots,
+            #     Touches,
+            #     Passes,
+            #     Tackles,
+            #     Clearances,
+            #     Corners,
+            #     Offsides,
+            #     Fouls conceded (if any),
+            #     Yellow cards (if any),
+            #     Red cards (if any)
+            #     ]
         '''
-        possession = stats_list[0].text.split()         # ['home_posession', 'Possession', '%', 'away_possession']
-        shots_ontarget = stats_list[1].text.split()     # ['home_shots_ontarger', 'Shots', 'on', 'target', 'away_shots_ontarget']
-        shots = stats_list[2].text.split()              # ['home_shots', 'Shots', 'away_shots']
-        touches = stats_list[3].text.split()            # ['home_touches', 'Shots', 'away_touches'] 
-        passes = stats_list[4].text.split()             # ['home_passes', 'Passes', 'away_passes']
-        tackles = stats_list[5].text.split()            # ['home_tackles', 'Tackles', 'away_tackles']
-        clearances = stats_list[6].text.split()         # ['home_clearances', 'Clearances', 'away_clearances']
-        corners = stats_list[7].text.split()            # ['home_corners', 'Corners', 'away_corners']
-        fouls_conceded = stats_list[-1].text.split()   # ['home_fouls_conceeded', 'Fouls', 'conceeded', 'away_fouls_conceeded']
-        if len(stats_list) == 9:
-            stats_reconstructed = [possession, shots_ontarget, shots, touches, passes, tackles,
-                                   clearances, corners, fouls_conceded]
-        elif len(stats_list) == 10:
-            offsides = stats_list[-2].text.split()      # ['home_offsides', 'Offsides', 'away_offsides']
-            stats_reconstructed = [possession, shots_ontarget, shots, touches, passes, tackles,
-                                   clearances, corners, offsides, fouls_conceded]
-        elif len(stats_list) == 11: # offsides/yellow/red cards not included in stats_list if 0 for each team
-            offsides = stats_list[-3].text.split()      # ['home_offsides', 'Offsides', 'away_offsides']
-            yellow_cards = stats_list[-2].text.split()  # ['home_yellow_cards', 'Yellow', 'cards', 'away_yellow_cards']
-            stats_reconstructed = [possession, shots_ontarget, shots,  touches, passes, tackles,
-                                   clearances, corners, offsides, yellow_cards, fouls_conceded]
-        elif len(stats_list) == 12:
-            offsides = stats_list[-4].text.split()  
-            yellow_cards = stats_list[-3].text.split()
-            red_cards = stats_list[-2].text.split()     # ['home_red_cards', 'Red', 'cards', 'away_red_cards']
-            stats_reconstructed = [possession, shots_ontarget, shots,  touches, passes, tackles,
-                                   clearances, corners, offsides, yellow_cards, red_cards, fouls_conceded]
+        stats_reconstructed = []
+        for i in range(len(stats_list)):
+            stat_split = stats_list[i].text.split()
+            stat_h = [stat_split[0]]
+            stat_a = [stat_split[-1]]
+            stat_name = [stat_split[1:-1]]
+            stats_reconstructed.append(stat_h + stat_a + stat_name)
         return stats_reconstructed
 
     def get_match_id(self, URL):
@@ -233,19 +170,32 @@ class PremierLeagueScraper:
         Returns:
             int: Match ID.
         '''
-        match_id = int(URL[-5:])
+        name_short = {
+            'Arsenal': 'ARS',
+            'Aston Villa': 'AVL',
+            'Brentford': 'BRE',
+            'Brighton': 'BHA',
+            'Burnley': 'BUR',
+            'Chelsea': 'CHE',
+            'Crystal Palace': 'CRY',
+            'Everton': 'EVE',
+            'Leeds': 'LEE',
+            'Leicester': 'LEI',
+            'Liverpool': 'LIV',
+            'Man City': 'MCI',
+            'Man Utd': 'MUN',
+            'Newcastle': 'NEW',
+            'Norwich': 'NOR',
+            'Southampton': 'SOU',
+            'Tottenham': 'TOT',
+            'Watford': 'WAT',
+            'West Ham': 'WHU',
+            'Wolves': 'WOL'
+        }
+        match_id = F'{URL[-5:]}-{name_short[self.club]}'
         return match_id
 
-    def generate_uuid(self):
-        '''
-        Generates a random UUID.
-
-        Returns:
-            obj: 32 digit UUID
-        '''
-        return uuid.uuid4()
-
-    def create_dictionary(self, match_id, date, location, home_or_away, result, stat_list):
+    def create_dictionary(self, match_id, info, home_or_away, result, stats_list):
         '''
         Creates the unique dictionary with all the information needed for each game.
         
@@ -260,49 +210,31 @@ class PremierLeagueScraper:
         Returns:
             dict
         '''
+        stats_dict = {
+                'Match ID': match_id,
+                'V4 UUID': str(uuid.uuid4()),
+                'Date': info[0],
+                'Location': info[1],
+                'Home or Away': home_or_away,
+                'Result': result[2]
+        }
         if home_or_away == 'Home':
-            stats_dictionary = {'Match ID': match_id,
-                                'V4 UUID': str(self.generate_uuid()),
-                                'Date': date,
-                                'Location': location,
-                                'Home or Away': home_or_away,
-                                'Result': result[2],
-                                'Goals scored': result[0],
-                                'Goals against': result[1],
-                                'Possession': float(stat_list[0][0]),
-                                'Shots on target': int(stat_list[1][0]),
-                                'Shots': int(stat_list[2][0]),
-                                'Touches': int(stat_list[3][0]),
-                                'Passes': int(stat_list[4][0]),
-                                'Tackles': int(stat_list[5][0]),
-                                'Clearances': int(stat_list[6][0]),
-                                'Corners': int(stat_list[7][0]),
-                                'Offsides': int(stat_list[8][0]),
-                                'Fouls conceeded': int(stat_list[-1][0])}
+            stats_dict['Goals scored']: result[0]
+            stats_dict['Goals against']: result[1]
+            for i in range(len(stats_list)):
+                stat_name = ' '.join(stats_list[i][2])
+                stats_dict[stat_name] = stats_list[i][0]
         else:
-            stats_dictionary = {'Match ID': match_id,
-                                'V4 UUID': str(self.generate_uuid()),
-                                'Date': date,
-                                'Location': location,
-                                'Home or Away': home_or_away,
-                                'Result': result[2],
-                                'Goals scored': result[1],
-                                'Goals against': result[0],
-                                'Possession': float(stat_list[0][3]),
-                                'Shots on target': int(stat_list[1][4]),
-                                'Shots': int(stat_list[2][2]),
-                                'Touches': int(stat_list[3][2]),
-                                'Passes': int(stat_list[4][2]),
-                                'Tackles': int(stat_list[5][2]),
-                                'Clearances': int(stat_list[6][2]),
-                                'Corners': int(stat_list[7][2]),
-                                'Offsides': int(stat_list[8][2]),
-                                'Fouls conceeded': int(stat_list[-1][3])}
-        return stats_dictionary
+            stats_dict['Goals scored']: result[1]
+            stats_dict['Goals against']: result[0]
+            for i in range(len(stats_list)):
+                stat_name = ' '.join(stats_list[i][2])
+                stats_dict[stat_name] = stats_list[i][1]         
+        return stats_dict
 
-    def save_data(self, match_id, raw_stats):
+    def save_data_locally(self, match_id, raw_stats):
         '''
-        Saves the dictionary of information into a new directory named after the club and a sub-directory after the match ID.
+        Saves the dictionary of information locally  into a new directory named after the club and a sub-directory after the match ID.
 
         Args:
             match_id (int): The unique ID of each match.
@@ -315,9 +247,19 @@ class PremierLeagueScraper:
         with open(f'{path}/data.json', 'w') as outfile:
             outfile.write(json_str)
 
+    def save_data_aws(self, match_id):
+        '''
+        Saves the dictionary of information in an AWS S3 bucket in the cloud, named after the match ID.
+
+        Args:
+            match_id (int): The unique ID of each match.
+        '''
+        s3_client = boto3.client('s3')
+        s3_client.upload_file(f'raw_data/{self.club}/{match_id}/data.json', 'premier-league-bucket', match_id)
+
     def scrape_links(self):
         '''Gets the list of links of all 38 fixtures of the club being inspected.'''
-        self.open_page(self.URL)
+        self.driver.get(self.URL)
         self.accept_cookies()
         self.scroll_to_bottom()
         self.get_fixture_link_list()
@@ -328,15 +270,15 @@ class PremierLeagueScraper:
         Args:
             link (str): The URL of the fixture to be inspected.
         '''
-        self.open_page(link)
-        self.click_stats()
+        self.driver.get(link)
+        WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.XPATH, '//li[@data-tab-index="2"]'))).click()
         dict = self.create_dictionary(self.get_match_id(link),
-                               self.get_match_date(),
-                               self.get_match_location(),
+                               self.get_match_info(),
                                self.home_or_away(),
                                self.get_result(self.home_or_away()),
-                               self.split_stats_list(self.get_stats()))
-        self.save_data(self.get_match_id(link), dict)
+                               self.split_stats_list(self.get_match_info()[2]))
+        self.save_data_locally(self.get_match_id(link), dict)
+        self.save_data_aws(self.get_match_id(link))
     
     def iterate_links(self, link_list):
         '''
@@ -347,25 +289,18 @@ class PremierLeagueScraper:
         '''
         for link in link_list:
             self.scrape_stats(f'https:{link}')
-
-    def close_browser(self):
-        '''Closes brower after all tasks are completed.'''
-        sleep(self.pause_time)
-        self.driver.quit()
        
     def run_crawler(self):
         '''Gets the list of 38 links to each fixture, goes through them one by one and extracts all the data required.'''
         self.scrape_links()
         self.iterate_links(self.get_fixture_link_list())
-        self.close_browser()
+        self.driver.quit()
         
 
 if __name__ == '__main__':
     premierleague = PremierLeagueScraper(
         driver=webdriver.Chrome(),
-        club = 'Chelsea',
-        URL='https://www.premierleague.com/results?co=1&se=418&cl=-1',
-        pause_time=1
+        club = 'Chelsea'
         )
     premierleague.run_crawler()
 
