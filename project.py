@@ -1,14 +1,15 @@
 import os
+from threading import local
 import uuid
 import json
 import boto3
 from time import sleep
 from selenium import webdriver
+from dataframe import upload_to_sql
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# Headless mode
 
 class PremierLeagueScraper:
     '''
@@ -20,6 +21,7 @@ class PremierLeagueScraper:
     club (str): The Premier League club to be inspected.
     URL (str): The URL of the 2021/22 results page from the official Premier League website.
     '''
+
     def __init__(self, driver, club):
         self.driver = driver
         self.club = club.capitalize()
@@ -43,15 +45,12 @@ class PremierLeagueScraper:
         except:
             pass # If there is no ad.
 
-    def scroll_to_bottom(self): # C.presence_of_element_located
-        '''Scrolls to 14/15ths of the way down the page, multiple times, to ensure all fixtures loaded.'''
-        sleep(2)
+    def scroll_to_bottom(self):
+        '''Scrolls down the page slowly to ensure all fixtures loaded.'''
         self.close_ad()
-        i = 0
-        while i < 5:
-            self.driver.execute_script(f"window.scrollTo(0,document.body.scrollHeight*14/15)")
-            sleep(2)
-            i += 1
+        for i in range(1, 37000, 5):
+                self.driver.execute_script("window.scrollTo(0, {});".format(i))
+    
 
     def get_fixture_link_list(self):
         '''
@@ -74,58 +73,49 @@ class PremierLeagueScraper:
             if len(link_list) != 38:
                 print(f'ERROR: {len(link_list)} fixtures in list. There should be 38.')
                 self.driver.refresh()
-                sleep(5)
                 self.close_ad()
-                sleep(1)
+                WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.XPATH, '//*[@class="fixtures__matches-list"]')))
                 self.scroll_to_bottom()
             else:
                 print('All 38 fixtures in list.')
                 return link_list
-
-    def home_or_away(self):
-        '''
-        Determines whether the game was played at home or away.
-        
-        Returns:
-            str: 'Home' or 'Away'
-        '''
-        score_container = self.driver.find_element(By.XPATH, '//div[@class="scoreboxContainer"]')
-        home_container = score_container.find_element(By.XPATH, '//div[contains(@class, "team home")]')
-        home_team = home_container.find_element(By.CSS_SELECTOR, 'span.long').text
-        if home_team == f'{self.club}':
-            return 'Home'
-        else:
-            return 'Away'
-
-    def get_result(self, home_or_away):
-        '''
-        Understands the result from the score of the match.
-
-        Returns:
-            str: 'Win', 'Loss' or 'Draw'.
-        '''
-        score = self.driver.find_element(By.XPATH, '//div[@class="score fullTime"]').text # 'home_score - away_score'
-        home_score = int(score[0])
-        away_score = int(score[2])
-        if (home_or_away == 'Home' and home_score > away_score) or (home_or_away == 'Away' and away_score > home_score):
-            return [home_score, away_score, 'Win']
-        elif home_score == away_score:
-            return [home_score, away_score, 'Draw']
-        else:
-            return [home_score, away_score, 'Loss']
     
     def get_match_info(self):
         '''
-        Extracts the date, name and location of the stadium played at and statistics from the stats page.
+        Extracts the date, name and location of the stadium played at, statistics and result from the stats page.
 
         Returns:
             list: Date in datetime format (%a %d %b %Y) as a string, stadium as a string, stats_list as a list.
         '''
         date_str = self.driver.find_element(By.XPATH, '//div[@class="matchDate renderMatchDateContainer"]').text
         stadium = self.driver.find_element(By.XPATH, '//div[@class="stadium"]').text
+
         stats_table = self.driver.find_element(By.XPATH, '//tbody[@class="matchCentreStatsContainer"]')
         stats_list = stats_table.find_elements(By.TAG_NAME, 'tr')
         info = [date_str, stadium, stats_list]
+
+        score_container = self.driver.find_element(By.XPATH, '//div[@class="scoreboxContainer"]')
+        home_container = score_container.find_element(By.XPATH, '//div[contains(@class, "team home")]')
+        home_team = home_container.find_element(By.CSS_SELECTOR, 'span.long').text
+        
+        score = self.driver.find_element(By.XPATH, '//div[@class="score fullTime"]').text # 'home_score - away_score'
+        home_score = int(score[0])
+        away_score = int(score[2])
+        
+        if home_team == f'{self.club}':
+            home_or_away = 'Home'
+        else:
+            home_or_away = 'Away'
+
+        info.append(home_or_away)
+
+        if (home_or_away == 'Home' and home_score > away_score) or (home_or_away == 'Away' and away_score > home_score):
+            info.append([home_score, away_score, 'Win'])
+        elif home_score == away_score:
+            info.append([home_score, away_score, 'Draw'])
+        else:
+            info.append([home_score, away_score, 'Loss'])
+
         return info
 
     def split_stats_list(self, stats_list):
@@ -136,20 +126,7 @@ class PremierLeagueScraper:
             stats_list (list): The list of all match statistics of both teams.
 
         Returns:
-            # list: [
-            #     Possession,
-            #     Shots on target,
-            #     Shots,
-            #     Touches,
-            #     Passes,
-            #     Tackles,
-            #     Clearances,
-            #     Corners,
-            #     Offsides,
-            #     Fouls conceded (if any),
-            #     Yellow cards (if any),
-            #     Red cards (if any)
-            #     ]
+            # list: In format [home_stat, away_stat, 'stat name']
         '''
         stats_reconstructed = []
         for i in range(len(stats_list)):
@@ -187,7 +164,7 @@ class PremierLeagueScraper:
             'Newcastle': 'NEW',
             'Norwich': 'NOR',
             'Southampton': 'SOU',
-            'Tottenham': 'TOT',
+            'Spurs': 'TOT',
             'Watford': 'WAT',
             'West Ham': 'WHU',
             'Wolves': 'WOL'
@@ -195,7 +172,7 @@ class PremierLeagueScraper:
         match_id = F'{URL[-5:]}-{name_short[self.club]}'
         return match_id
 
-    def create_dictionary(self, match_id, info, home_or_away, result, stats_list):
+    def create_dictionary(self, match_id, info, stats_list):
         '''
         Creates the unique dictionary with all the information needed for each game.
         
@@ -211,25 +188,25 @@ class PremierLeagueScraper:
             dict
         '''
         stats_dict = {
-                'Match ID': match_id,
-                'V4 UUID': str(uuid.uuid4()),
+                'Match id': match_id,
+                'V4 uuid': str(uuid.uuid4()),
                 'Date': info[0],
                 'Location': info[1],
-                'Home or Away': home_or_away,
-                'Result': result[2]
+                'Home or away': info[3],
+                'Result': info[4][2]
         }
-        if home_or_away == 'Home':
-            stats_dict['Goals scored']: result[0]
-            stats_dict['Goals against']: result[1]
+        if info[3] == 'Home':
+            stats_dict['Goals scored'] = info[4][0]
+            stats_dict['Goals against'] = info[4][1]
             for i in range(len(stats_list)):
                 stat_name = ' '.join(stats_list[i][2])
                 stats_dict[stat_name] = stats_list[i][0]
         else:
-            stats_dict['Goals scored']: result[1]
-            stats_dict['Goals against']: result[0]
+            stats_dict['Goals scored'] = info[4][1]
+            stats_dict['Goals against'] = info[4][0]
             for i in range(len(stats_list)):
                 stat_name = ' '.join(stats_list[i][2])
-                stats_dict[stat_name] = stats_list[i][1]         
+                stats_dict[stat_name] = stats_list[i][1]       
         return stats_dict
 
     def save_data_locally(self, match_id, raw_stats):
@@ -259,10 +236,10 @@ class PremierLeagueScraper:
 
     def scrape_links(self):
         '''Gets the list of links of all 38 fixtures of the club being inspected.'''
-        self.driver.get(self.URL)
         self.accept_cookies()
+        self.close_ad()
         self.scroll_to_bottom()
-        self.get_fixture_link_list()
+        return self.get_fixture_link_list()
           
     def scrape_stats(self, link):
         '''Scrapes the statistics from each match and stores in a .json file
@@ -272,35 +249,40 @@ class PremierLeagueScraper:
         '''
         self.driver.get(link)
         WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.XPATH, '//li[@data-tab-index="2"]'))).click()
-        dict = self.create_dictionary(self.get_match_id(link),
-                               self.get_match_info(),
-                               self.home_or_away(),
-                               self.get_result(self.home_or_away()),
-                               self.split_stats_list(self.get_match_info()[2]))
-        self.save_data_locally(self.get_match_id(link), dict)
-        self.save_data_aws(self.get_match_id(link))
-    
-    def iterate_links(self, link_list):
-        '''
-        Goes through the links one by one and extracts the information needed.
+        dict = self.create_dictionary(
+            self.get_match_id(link),
+            self.get_match_info(),
+            self.split_stats_list(self.get_match_info()[2])
+            )
+        if local_or_cloud == 'locally':
+            self.save_data_locally(self.get_match_id(link), dict)
+        elif local_or_cloud == 'rds':
+            self.save_data_aws(self.get_match_id(link))
+        elif local_or_cloud == 'both':
+            self.save_data_locally(self.get_match_id(link), dict)
+            self.save_data_aws(self.get_match_id(link))
 
-        Args:
-            link_list (list): A list of all 38 URLs corresponding to each fixture.
-        '''
-        for link in link_list:
-            self.scrape_stats(f'https:{link}')
+    def where_to_save(self):
+        global local_or_cloud
+        local_or_cloud = None
+        options = ['local', 'rds', 'both']
+        while local_or_cloud not in options:
+            local_or_cloud = input(f'Would you like to save this data locally, upload to RDS or both?\nPlease enter "local", "rds" or "both". ')
        
     def run_crawler(self):
         '''Gets the list of 38 links to each fixture, goes through them one by one and extracts all the data required.'''
-        self.scrape_links()
-        self.iterate_links(self.get_fixture_link_list())
+        self.where_to_save()
+        self.driver.get(self.URL)
+        self.driver.maximize_window()
+        for link in self.scrape_links():
+            self.scrape_stats(f'https:{link}')
+        upload_to_sql(self.club)
         self.driver.quit()
         
 
 if __name__ == '__main__':
     premierleague = PremierLeagueScraper(
-        driver=webdriver.Chrome(),
-        club = 'Chelsea'
+        driver=webdriver.Firefox(),
+        club='Spurs'
         )
     premierleague.run_crawler()
-
