@@ -122,3 +122,27 @@ def tearDown(self):
 ```
 
 - The 11 tests take around 170 seconds to run. There is a slight issue with the ```scroll_to_bottom()``` method due to the page not loading fast enough, however more times than not the test passes. The file ```project.py``` runs fine with this method, as they page does not need to be scrolled to the absolute bottom to load in its entirety.
+
+## Milestone 5: Scalably storing the data
+
+- An Amazon Simple Storage Service (S3) is a data lake which is used to store files on the cloud. The bucket ```premier-league-bucket``` has been created and a method to give the user the option to store the ```data.json``` files locally, on the cloud or both has been added. This is achieved using the AWS software development kit (SKD) ```boto3```.
+
+```python
+s3_client = boto3.client('s3')
+s3_client.upload_file(f'raw_data/{self.club}/{match_id}/data.json', 'premier-league-bucket', match_id)
+```
+> Uploading to the S3 bucket using ```boto3```.
+
+- Amazon Relational Database Service (RDS) allows us to create a highly scalably database in the cloud. First, a virtual network is established to limit the range of IP addresses that can be used to access this service. Then, the database ```date-pipeline-project``` is created with PostgreSQL and accessed using pgAdmin 14. The function ```upload_to_sql()``` is created in the ```dataframe.py``` file to download the files containing the data for the club being inspected from the S3 bucket, create a panda and upload to the RDS using ```sqlalchemy```.
+
+```python
+DATABASE_TYPE = 'postgresql'
+    DBAPI = 'psycopg2'
+    HOST = 'aicore-db.ckoq1wsuhqob.us-east-1.rds.amazonaws.com'
+    USER = 'postgres'
+    PASSWORD = '**********'
+    DATABASE = 'data-pipeline-project'
+    PORT = 5432
+    engine = create_engine(f"{DATABASE_TYPE}+{DBAPI}://{USER}:{PASSWORD}@{HOST}:{PORT}/{DATABASE}")
+```
+> Creating the RDS engine using ```sqlalchemy```.
