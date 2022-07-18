@@ -1,5 +1,4 @@
 import os
-from threading import local
 import uuid
 import json
 import boto3
@@ -65,8 +64,7 @@ class PremierLeagueScraper:
     def select_season(self):
         self.driver.find_element(By.XPATH, '//div[@aria-labelledby="dd-compSeasons"][@role="button"]').click()
         options = self.driver.find_element(By.XPATH, '//ul[@data-dropdown-list="compSeasons"]')
-        WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable(
-            options.find_element(By.XPATH, f'//li[@data-option-name="{self.year}"]'))).click()
+        options.find_element(By.XPATH, f'//li[@data-option-name="{self.year}"]').click()
 
     def scroll_to_bottom(self):
         '''Selects the correct season and scrolls down the page slowly to ensure all fixtures loaded.'''
@@ -272,7 +270,7 @@ class PremierLeagueScraper:
 
 if __name__ == '__main__':
     options = Options()
-    options.headless = False
+    options.headless = True
     options.add_argument("--window-size=1920,1080")
     premierleague = PremierLeagueScraper(
         driver=webdriver.Chrome(options=options)
