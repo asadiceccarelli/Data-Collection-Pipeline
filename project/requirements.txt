@@ -1,0 +1,44 @@
+# This file may be used to create an environment using:
+# $ conda create --name <env> --file <this file>
+# platform: osx-64
+boto3=1.24.31=pypi_0
+botocore=1.27.31=pypi_0
+brotlipy=0.7.0=py310hca72f7f_1002
+bzip2=1.0.8=h1de35cc_0
+ca-certificates=2022.4.26=hecd8cb5_0
+certifi=2022.6.15=py310hecd8cb5_0
+cffi=1.15.0=py310hc55c11b_1
+cryptography=37.0.1=py310hf6deb26_0
+greenlet=1.1.1=py310he9d5cce_0
+idna=3.3=pyhd3eb1b0_0
+jmespath=1.0.1=pypi_0
+krb5=1.19.2=hcd88c3b_0
+libcxx=12.0.0=h2f01273_0
+libedit=3.1.20210910=hca72f7f_0
+libffi=3.3=hb1e8313_2
+libpq=12.9=h1c9f633_3
+ncurses=6.3=hca72f7f_3
+numpy=1.23.1=pypi_0
+openssl=1.1.1q=hca72f7f_0
+pandas=1.4.3=pypi_0
+pip=22.1.2=py310hecd8cb5_0
+psycopg2=2.8.6=py310h0a4fc7d_1
+pycparser=2.21=pyhd3eb1b0_0
+pyopenssl=22.0.0=pyhd3eb1b0_0
+pysocks=1.7.1=py310hecd8cb5_0
+python=3.10.4=hdfd78df_0
+python-dateutil=2.8.2=pypi_0
+pytz=2022.1=pypi_0
+readline=8.1.2=hca72f7f_1
+s3transfer=0.6.0=pypi_0
+selenium=3.141.0=py310hca72f7f_1000
+setuptools=61.2.0=py310hecd8cb5_0
+six=1.16.0=pypi_0
+sqlalchemy=1.4.39=py310hca72f7f_0
+sqlite=3.38.5=h707629a_0
+tk=8.6.12=h5d9f67b_0
+tzdata=2022a=hda174b7_0
+urllib3=1.26.10=pypi_0
+wheel=0.37.1=pyhd3eb1b0_0
+xz=5.2.5=hca72f7f_1
+zlib=1.2.12=h4dc903c_2
