@@ -4,4 +4,4 @@ COPY . .
 
 RUN pip install -r requirements.txt
 
-CMD ['python', 'project/scraper.py']
+CMD ["python", "project/scraper.py"]
