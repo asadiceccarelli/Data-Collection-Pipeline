@@ -82,6 +82,7 @@ class PremierLeagueScraper:
         link_list = []
         if len(link_list) != 38:
             link_list = []
+            WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.XPATH, '//*[@class="fixtures__matches-list"]')))
             fixture_list = self.driver.find_element(By.XPATH, '//section[@class="fixtures"]')
             home_games = fixture_list.find_elements(By.XPATH, f'//li[@data-home="{self.club}"]')
             away_games = fixture_list.find_elements(By.XPATH, f'//li[@data-away="{self.club}"]')
@@ -232,6 +233,9 @@ class PremierLeagueScraper:
         self.select_season()
         self.scroll_to_bottom()
         return self.get_fixture_link_list()
+
+    def get_graphs(self):
+        pass
           
     def scrape_stats(self, link):
         '''Scrapes the statistics from each match and stores in a .json file
@@ -257,22 +261,21 @@ class PremierLeagueScraper:
         '''Gets the list of 38 links to each fixture, goes through them one by one and extracts all the data required.'''
         self.user_inputs()
         if f'{self.club}-{self.year[-5:-3]}{self.year[-2:]}' not in RDS_access.prevent_rescraping():
+            
             self.driver.get(self.URL)
-            self.driver.maximize_window()
             for link in self.scrape_links():
                 self.scrape_stats(f'https:{link}')
             RDS_access.upload_to_sql(self.club, self.year)
             self.driver.quit()
         else:
-            print('RDS already contains data on this team from this season.')
+            print('RDS database already contains data on this club from this season.')
             self.driver.quit()
     
 
 if __name__ == '__main__':
     options = Options()
-    options.headless = True
-    options.add_argument("--window-size=1920,1080")
-    premierleague = PremierLeagueScraper(
-        driver=webdriver.Chrome(options=options)
-        )
+    options.headless = False
+    options.add_argument('--window-size=1920,1080')
+    options.add_argument('--start-maximized')
+    premierleague = PremierLeagueScraper(driver=webdriver.Chrome(executable_path='/usr/local/bin/chromedriver', options=options))
     premierleague.run_crawler()

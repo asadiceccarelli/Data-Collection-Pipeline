@@ -2,7 +2,7 @@ import unittest
 from time import sleep
 from selenium import webdriver
 from project import PremierLeagueScraper
-from RDS_access import upload_to_sql
+from project.RDS_access import upload_to_sql
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
