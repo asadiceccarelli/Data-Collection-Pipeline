@@ -2,7 +2,7 @@ import os
 import uuid
 import json
 import boto3
-import RDS_access
+import RDS
 import valid_inputs
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -260,12 +260,12 @@ class PremierLeagueScraper:
     def run_crawler(self):
         '''Gets the list of 38 links to each fixture, goes through them one by one and extracts all the data required.'''
         self.user_inputs()
-        if f'{self.club}-{self.year[-5:-3]}{self.year[-2:]}' not in RDS_access.prevent_rescraping():
+        if f'{self.club}-{self.year[-5:-3]}{self.year[-2:]}' not in RDS.prevent_rescraping():
             
             self.driver.get(self.URL)
             for link in self.scrape_links():
                 self.scrape_stats(f'https:{link}')
-            RDS_access.upload_to_sql(self.club, self.year)
+            RDS.upload_to_sql(self.club, self.year)
             self.driver.quit()
         else:
             print('RDS database already contains data on this club from this season.')
@@ -274,7 +274,7 @@ class PremierLeagueScraper:
 
 if __name__ == '__main__':
     options = Options()
-    options.headless = False
+    options.headless = True
     options.add_argument('--window-size=1920,1080')
     options.add_argument('--start-maximized')
     premierleague = PremierLeagueScraper(driver=webdriver.Chrome(executable_path='/usr/local/bin/chromedriver', options=options))
