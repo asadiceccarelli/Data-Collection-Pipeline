@@ -1,8 +1,10 @@
 import boto3
 import json
 import pandas as pd
+import matplotlib.pyplot as plt
 from valid_inputs import valid_clubs
 from sqlalchemy import create_engine, inspect
+
 
 
 def rds_connect():
@@ -45,3 +47,4 @@ def prevent_rescraping():
     engine = rds_connect()
     inspector = inspect(engine)
     return inspector.get_table_names()
+
