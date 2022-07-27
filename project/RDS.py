@@ -1,8 +1,7 @@
 import boto3
 import json
 import pandas as pd
-import matplotlib.pyplot as plt
-from valid_inputs import valid_clubs
+from project.valid_inputs import valid_clubs
 from sqlalchemy import create_engine, inspect
 
 
@@ -22,7 +21,8 @@ def upload_to_sql(club, year):
     engine = rds_connect()
     s3 = boto3.resource('s3')
     my_bucket = s3.Bucket('premier-league-bucket')
-
+    
+    print('Creating data fram using pandas...')
     stats_dict_list = []
     name_short = valid_clubs()[club]
     for obj in my_bucket.objects.all():
@@ -38,13 +38,13 @@ def upload_to_sql(club, year):
     df['Location'] = df['Location'].astype('category')
     df['Possession %']=df['Possession %'].astype('float64')
 
+    print('Uploading to RDS...')
     df_name = f'{club}-{year[-5:-3]}{year[-2:]}'
     df.to_sql(df_name, engine, if_exists='replace', index=False)
     return df
 
 
-def prevent_rescraping():
+def _prevent_rescraping():
     engine = rds_connect()
     inspector = inspect(engine)
     return inspector.get_table_names()
-
