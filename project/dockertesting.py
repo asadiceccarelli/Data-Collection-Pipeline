@@ -23,3 +23,4 @@
 # driver.quit()
 # print("Test Execution Successfully Completed!")
 
+print(i.strip() for i in open("requirements.txt").readlines())
