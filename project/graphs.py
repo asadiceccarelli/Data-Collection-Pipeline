@@ -21,18 +21,18 @@ class CreateGraph:
         self.query = f'SELECT * FROM public."{self.club}-{self.year[-5:-3]}{self.year[-2:]}" ORDER BY "Date"'
         self.query_result = self.connection.execute(self.query)
         self.values = self.query_result.fetchall()
-        self.home_stadium = max(set(self._stats_list()[1]), key = self._stats_list()[1].count)  # Finds home stadium from the most common element in list
+        self.home_stadium = max(set(self._get_stats_list()[1]), key = self._get_stats_list()[1].count)  # Finds home stadium from the most common element in list
 
-    def _stats_list(self):
+    def _get_stats_list(self):
         '''
         Return [dates, locations, homes_or_away, results, goals_scored, goals_against,
             possession, shots_on_target, shots, touches, passes, tackles, clearances,
             corners, offsides, fouls_conceeded, yellow_cards, red_cards]
         '''
-        _stats_list = []
+        stats_list = []
         for i in range(2, 20):
-            _stats_list.append([j[i] for j in self.values])
-        return _stats_list
+            stats_list.append([j[i] for j in self.values])
+        return stats_list
 
     def _home_vs_away(self, location):
         '''
@@ -72,9 +72,9 @@ class CreateGraph:
 
     def _results_pie(self):
         '''Creates a pie chart showing the percentage of each win, loss and draw.'''
-        wins = self._stats_list()[3].count('Win')
-        draws = self._stats_list()[3].count('Draw')
-        sizes = [wins, draws, len(self._stats_list()[3]) - wins - draws]
+        wins = self._get_stats_list()[3].count('Win')
+        draws = self._get_stats_list()[3].count('Draw')
+        sizes = [wins, draws, len(self._get_stats_list()[3]) - wins - draws]
         mylabels = ['Wins', 'Draws', 'Losses']
         mycolors = ['g', 'y', 'r']
         myexplode = [0.2, 0, 0]
@@ -187,25 +187,25 @@ class CreateGraph:
 
     def _shots_line(self):
         '''Creates a line graph showing the shots and shots on target in comparison with a bar chart of goals scored, combines using the twinx() method.'''
-        self.ax9.bar(self._stats_list()[0], self._stats_list()[4], width=3, color='green')
+        self.ax9.bar(self._get_stats_list()[0], self._get_stats_list()[4], width=3, color='green')
         ax11 = self.ax9.twinx()  # Shares x axis
-        ax11.plot(self._stats_list()[0], self._stats_list()[8])
-        ax11.plot(self._stats_list()[0], self._stats_list()[7])
+        ax11.plot(self._get_stats_list()[0], self._get_stats_list()[8])
+        ax11.plot(self._get_stats_list()[0], self._get_stats_list()[7])
         self.ax9.set_title('Shots, shots on target and goals scored')
-        self.ax9.set_xlim([self._stats_list()[0][0], self._stats_list()[0][-1] + relativedelta(days=+50)])  # Leaves space for legend
+        self.ax9.set_xlim([self._get_stats_list()[0][0], self._get_stats_list()[0][-1] + relativedelta(days=+50)])  # Leaves space for legend
         self.ax9.legend(['Goals scored'])
         ax11.legend(['Shots', 'Shots on target'], loc='lower right')
 
     def _fouls_cards_twin(self):
         '''Creates a line graph showing the fouls conceeded in comparison with a bar chart of yellow and red cards, combines using the twinx() method.'''
-        self.ax10.bar(self._stats_list()[0], self._stats_list()[-2], width=3, color='gold')
-        self.ax10.bar(self._stats_list()[0], self._stats_list()[-1], width=3, color='red')
+        self.ax10.bar(self._get_stats_list()[0], self._get_stats_list()[-2], width=3, color='gold')
+        self.ax10.bar(self._get_stats_list()[0], self._get_stats_list()[-1], width=3, color='red')
         ax12 = self.ax10.twinx()  # Shares x axis
-        ax12.plot(self._stats_list()[0], self._stats_list()[-3])
+        ax12.plot(self._get_stats_list()[0], self._get_stats_list()[-3])
         ax12.set_title('Fouls and carded offences')
         self.ax10.set_ylabel('No. cards')
         ax12.set_ylabel('No. fouls')
-        ax12.set_xlim([self._stats_list()[0][0], self._stats_list()[0][-1] + relativedelta(days=+50)])  # Leaves space for legend
+        ax12.set_xlim([self._get_stats_list()[0][0], self._get_stats_list()[0][-1] + relativedelta(days=+50)])  # Leaves space for legend
         self.ax10.legend(['Yellow cards', 'Red cards'])
         ax12.legend(['Fouls conceeded'], loc='lower right')
 
@@ -227,5 +227,5 @@ class CreateGraph:
 
 
 if __name__ == '__main__':
-    PL = CreateGraph('Man City', '2021/22')
+    PL = CreateGraph('Chelsea', '2021/22')
     PL.show_graphs()
