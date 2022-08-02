@@ -1,4 +1,5 @@
 import unittest
+from numpy import place
 from selenium import webdriver
 from project.scraper import PremierLeagueScraper
 from project.RDS import upload_to_sql
@@ -11,12 +12,17 @@ class PremierLeagueScraperTestCase(unittest.TestCase):
     def setUp(self):
         '''Opens the match results page in headless mode.'''
         self.options = Options()
-        self.options.headless = True
+        self.options.add_argument("--disable-gpu")
+        self.options.add_argument("--disable-extensions")
+        self.options.add_argument("--disable-infobars")
         self.options.add_argument('--window-size=1920,1080')
-        self.options.add_argument('--start-maximized')
+        self.options.add_argument("--disable-notifications")
+        self.options.add_argument('--headless')
+        self.options.add_argument('--no-sandbox')
+        self.options.add_argument('--disable-dev-shm-usage')
         self.pl = PremierLeagueScraper(driver=webdriver.Chrome(options=self.options))
         self.pl.club = 'Chelsea'  # Test
-        self.pl.year = '2021/22'
+        self.pl.year = '1999/00'
 
     def test_select_season(self):
         '''Tests that the correct season has been selected from the dropdown menu.'''
@@ -24,23 +30,28 @@ class PremierLeagueScraperTestCase(unittest.TestCase):
         self.pl._accept_cookies()
         self.pl._close_ad()
         self.pl._select_season()
-        year_selected = self.pl.driver.find_element(By.XPATH, '//div[@aria-labelledby="dd-compSeasons"][@role="button"]').text
+        self.pl._close_ad()
+        year_selected = self.pl.driver.find_element(By.CSS_SELECTOR, '[aria-labelledby="dd-compSeasons"][role="button"]').get_attribute('textContent')
         self.assertEqual(self.pl.year, year_selected)
     
     def test_scroll_to_bottom(self):
-        '''Tests to ensure the document height page does not change after the first scroll i.e. is already fully loaded.'''
+        '''
+        Tests to ensure the document height page does not change after the first scroll i.e. is already fully loaded.
+        Tests the page lengths are the same to 2sf. 
+        '''
         self.pl.driver.get(self.pl.URL)
         self.pl._accept_cookies()
         self.pl._scroll_to_bottom()
         height_1 = self.pl.driver.execute_script('return document.body.scrollHeight')
         self.pl._scroll_to_bottom()
         height_2 = self.pl.driver.execute_script('return document.body.scrollHeight')
-        self.assertAlmostEqual(height_1, height_2)
+        self.assertAlmostEqual(height_1/1000, height_2/1000, place==1)
 
     def test_get_fixture_link_list(self):
         '''Tests that the fixture list has the required 38 games.'''
         self.pl.driver.get(self.pl.URL)
         self.pl._accept_cookies()
+        self.pl._select_season()
         self.pl._scroll_to_bottom()
         link_list = self.pl._get_fixture_link_list()
         self.assertEqual(len(link_list), 38)

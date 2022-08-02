@@ -1,16 +1,23 @@
+from multiprocessing.sharedctypes import Value
 import os
 import sys
+import logging
 import uuid
 import json
 import boto3
+import shutil
 import project.RDS as RDS
 import project.valid_inputs as valid_inputs
 from project.graphs import CreateGraph
 from selenium import webdriver
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.action_chains import ActionChains
+
+logging.basicConfig(level = logging.INFO)
 
 
 class PremierLeagueScraper:
@@ -26,98 +33,94 @@ class PremierLeagueScraper:
 
     def __init__(self, driver):
         self.driver = driver
-        self.URL = 'https://www.premierleague.com/results?co=1&se=274&cl=-1'
-        self.driver.implicitly_wait(10)
-
+        self.URL = 'https://www.premierleague.com/results'
 
     def _user_inputs(self):
         '''Checks the inputs from the user are valid.'''
-        self.club = input('Which club would you like to inspect? ').title()
-        while self.club not in valid_inputs.valid_clubs().keys():
-            self.club = input(f'Please enter a valid club. You may need to enter a shortened version, e.g. \'Spurs\' or \'QPR\'. ').title()
+        # self.club = input('Which club would you like to inspect? ').title()
+        # while self.club not in valid_inputs.valid_clubs().keys():
+        #     self.club = input(f'Please enter a valid club. You may need to enter a shortened version, e.g. \'Spurs\' or \'QPR\'. ').title()
         
-        self.year = input('Which season would you like to inspect? ')
-        while self.year not in valid_inputs.valid_seasons():
-            self.year = input(f'Please enter a valid season, e.g. \'2011/12\'. ')
+        # self.year = input('Which season would you like to inspect? Enter in the format YYYY/YY. ')
+        # while self.year not in valid_inputs.valid_seasons():
+        #     self.year = input(f'Please enter a valid season, e.g. \'2011/12\'. ')
 
-        self.save_location = input('Where would you like to save this data? ')
-        while self.save_location not in ['local', 'rds', 'both']:
-            self.save_location = input(f'Please enter \'local\', \'rds\' or \'both\'. ')
+        # self.save_location = input('Where would you like to save this data? Please enter \'local\', \'rds\' or \'both\'. ')
+        # while self.save_location not in ['local', 'rds', 'both']:
+        #     self.save_location = input(f'Please enter \'local\', \'rds\' or \'both\'. ')
+        self.club = 'Chelsea'
+        self.year = '1995/96' 
+        self.save_location = 'both'
     
     def _accept_cookies(self):
         '''Wait for window and accepts all cookies. Does nothing if no window.'''
         try:
-            accept_cookies_button = WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.XPATH,
-                '//*[@class="_2hTJ5th4dIYlveipSEMYHH BfdVlAo_cgSVjDUegen0F js-accept-all-close"]')))
-            accept_cookies_button.click()
-            print('Cookies accepted.')
-        except:
-            print('No cookies to be accepted.')
-            pass # If there are no cookies.
+            WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.CSS_SELECTOR,
+                'button[class^="_2hTJ5th4dIYlveipSEMYHH BfdVlAo_cgSVjDUegen0F"]'))).click()
+            logging.info('Cookies accepted.')
+        except TimeoutError:
+            logging.info('No cookies to be accepted.')
+            pass
 
     def _close_ad(self):
         '''Closes ad if ad window appears. Does nothing if no ad.'''
         try:
-            self.driver.find_element(By. XPATH, '//*[@class="closeBtn"]').click()
-            print('Ad closed.')
-        except:
-            print('No ad.')
-            pass # If there is no ad.
+            WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'a[class="closeBtn"]'))).click()
+            logging.info('Ad closed.')
+        except TimeoutException:
+            pass
 
     def _select_season(self):
         '''Selects the correct season to be inspected'''
-        print('Selecting season...')
-        self.driver.switch_to.default_content()
-        try:
-            # self.driver.switch_to.default_content()
-            self.driver.find_element(By.XPATH, '//div[@aria-labelledby="dd-compSeasons"][@role="button"]').click()
-            options = self.driver.find_element(By.XPATH, '//ul[@data-dropdown-list="compSeasons"]')
-            options.find_element(By.XPATH, f'//li[@data-option-name="{self.year}"]').click()
-        except:
-            self._close_ad()
+        logging.info('Selecting season...')
+        self._close_ad()
+        WebDriverWait(self.driver, 10).until(EC.visibility_of_element_located((By.CSS_SELECTOR,
+            '[aria-labelledby="dd-compSeasons"][role="button"]'))).click()
+        desired_season = self.driver.find_element(By. XPATH, f'//li[contains(text(),"{self.year}")]')
+        actions = ActionChains(self.driver)
+        actions.move_to_element(desired_season).perform()
+        desired_season.click()
 
     def _scroll_to_bottom(self):
         '''Selects the correct season and scrolls down the page slowly to ensure all fixtures loaded.'''
-        print('Scrolling to bottom of the page...')
+        logging.info('Scrolling to bottom of the page...')
+        WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.XPATH, '//div[@class="fixtures__matches-list"]')))
         self._close_ad()
         for i in range(1, 37000, 5):  # 37000 length of page, scrolls 5 at a time
                 self.driver.execute_script("window.scrollTo(0, {});".format(i))
     
-    def _get_fixture_link_list(self):
+    def _get_fixture_link_list(self, correct_no_fixtures):
         '''
         Retrieves the href links to each match and stores them in a list.
         
         Returns:
             list: A list of all the URLs to each match the club has played over the course of the season.
         '''
-        print('Getting fixture links...')
+        logging.info('Getting fixture links...')
         link_list = []
-        if len(link_list) != 38:
+        while len(link_list) != correct_no_fixtures:
             link_list = []
             WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.XPATH, '//*[@class="fixtures__matches-list"]')))
-            fixture_list = self.driver.find_element(By.XPATH, '//section[@class="fixtures"]')
-            home_games = fixture_list.find_elements(By.XPATH, f'//li[@data-home="{self.club}"]')
-            away_games = fixture_list.find_elements(By.XPATH, f'//li[@data-away="{self.club}"]')
+            fixture_list = self.driver.find_element(By.CSS_SELECTOR, 'section[class="fixtures"]')
+            home_games = fixture_list.find_elements(By.CSS_SELECTOR, f'li[data-home="{self.club}"]')
+            away_games = fixture_list.find_elements(By.CSS_SELECTOR, f'li[data-away="{self.club}"]')
             game_list = home_games + away_games
             for game in game_list:
                 link_class = game.find_element(By.XPATH, "./div")
                 link = link_class.get_attribute('data-href')
                 link_list.append(link)
-            if len(link_list) == 38:
-                print('All 38 fixtures in list.')
+            if len(link_list) == correct_no_fixtures:
+                logging.info(f'All {correct_no_fixtures} fixtures in list.')
                 return link_list
             elif len(link_list) == 0:
-                print('Sorry, this club was not in the premier league during the season you entered.')
+                logging.error(f'This club was not in the premier league during the {self.year} season.')
                 self.driver.quit()
                 sys.exit()
-            print(f'ERROR: {len(link_list)} fixtures in list. There should be 38.')
+            logging.error(f'{len(link_list)} fixtures in list. There should be {correct_no_fixtures}.')
             self.driver.refresh()
-            self.close_ad()
-            WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.XPATH, '//div[@class="fixtures__matches-list"]')))
-            self.scroll_to_bottom()
-            self.get_fixture_link_list()
-        else:
-            print('All 38 fixtures in list.')
+            self._close_ad()
+            WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, 'div[class="fixtures__matches-list"]')))
+            self._scroll_to_bottom()
             return link_list
     
     def _get_match_info(self, link):
@@ -127,16 +130,16 @@ class PremierLeagueScraper:
         Returns:
             list: Date in datetime format (%a %d %b %Y) as a string, stadium as a string, stats_list as a list.
         '''
-        date_str = self.driver.find_element(By.XPATH, '//div[@class="matchDate renderMatchDateContainer"]').text
-        stadium = self.driver.find_element(By.XPATH, '//div[@class="stadium"]').text
+        date_str = self.driver.find_element(By.CSS_SELECTOR, 'div[class^="matchDate renderMatchDateContainer"]').text
+        stadium = self.driver.find_element(By.CSS_SELECTOR, 'div[class="stadium"]').text
 
-        stats_table = self.driver.find_element(By.XPATH, '//tbody[@class="matchCentreStatsContainer"]')
+        stats_table = self.driver.find_element(By.CSS_SELECTOR, 'tbody[class="matchCentreStatsContainer"]')
         stats_list = stats_table.find_elements(By.TAG_NAME, 'tr')
         info = [date_str, stadium, stats_list]
 
-        score_container = self.driver.find_element(By.XPATH, '//div[@class="scoreboxContainer"]')
-        home_container = score_container.find_element(By.XPATH, '//div[@class = "team home"]')
-        home_team_short = home_container.find_element(By.XPATH, '//span[@class = "short"]').get_attribute('textContent')  # get_attribute as element is not visible
+        score_container = self.driver.find_element(By.CSS_SELECTOR, 'div[class="scoreboxContainer"]')
+        home_container = score_container.find_element(By.CSS_SELECTOR, 'div[class="team home"]')
+        home_team_short = home_container.find_element(By.CSS_SELECTOR, 'span[class="short"]').get_attribute('textContent')  # get_attribute as element is not visible
         
         score = self.driver.find_element(By.XPATH, '//div[@class="score fullTime"]').text # 'home_score - away_score'
         home_score = int(score[0])
@@ -171,8 +174,8 @@ class PremierLeagueScraper:
             list: In format [home_stat, away_stat, 'stat name']
         '''
         stats_reconstructed = []
-        for i in range(len(stats_list)):
-            stat_split = stats_list[i].text.split()
+        for stat in stats_list:
+            stat_split = stat.text.split()
             stat_h = [stat_split[0]]
             stat_a = [stat_split[-1]]
             stat_name = [stat_split[1:-1]]
@@ -219,30 +222,27 @@ class PremierLeagueScraper:
     def save_data_locally(self, match_id, raw_stats):
         '''
         Saves the dictionary of information locally  into a new directory named after the club and a sub-directory after the match ID.
-
         Args:
             match_id (int): The unique ID of each match.
             raw_stats (dict): The unique dictionary with all the information needed from the match.
         '''
-        print('Saving .json files locally...')
-        path = f'/Users/asadiceccarelli/Documents/AiCore/Data-Collection-Pipeline/raw_data/{self.club}-{self.year[-5:-3]}{self.year[-2:]}/{match_id}'
+        path = f'/Users/asadiceccarelli/Documents/AiCore/Data-Collection-Pipeline/raw_data/{self.club}/{match_id}'
         if not os.path.exists(path):
             os.makedirs(path)
         json_str = json.dumps(raw_stats)
         with open(f'{path}/data.json', 'w') as outfile:
             outfile.write(json_str)    
-        print(f'{match_id} saved locally.')  
+        logging.info(f'{match_id} saved locally.')  
 
     def save_data_aws(self, match_id):
         '''
         Saves the dictionary of information in an AWS S3 bucket in the cloud, named after the match ID.
-
         Args:
             match_id (int): The unique ID of each match.
         '''
         s3_client = boto3.client('s3')
-        s3_client.upload_file(f'raw_data/{self.club}-{self.year[-5:-3]}{self.year[-2:]}/{match_id}/data.json', 'premier-league-bucket', match_id)
-        print(f'{match_id} saved to AWS S3 bucket.')
+        s3_client.upload_file(f'raw_data/{self.club}/{match_id}/data.json', 'premier-league-bucket', match_id)
+        logging.info(f'{match_id} saved to AWS S3 bucket.')
 
     def _scrape_links(self):
         '''Gets the list of links of all 38 fixtures of the club being inspected.'''
@@ -250,8 +250,13 @@ class PremierLeagueScraper:
         self._close_ad()
         self._select_season()
         self._scroll_to_bottom()
-        print('Extracting and saving information for each match...')
-        return self._get_fixture_link_list()
+        logging.info('Extracting and saving information for each match...')
+        seasons_with_22 = ['1992/93', '1993/94', '1994/95']
+        if self.year in seasons_with_22:
+            correct_no_fixtures = 42
+        else:
+            correct_no_fixtures = 38
+        return self._get_fixture_link_list(correct_no_fixtures)
           
     def _scrape_stats(self, link):
         '''Scrapes the statistics from each match and stores in a .json file
@@ -260,23 +265,32 @@ class PremierLeagueScraper:
             link (str): The URL of the fixture to be inspected.
         '''
         self.driver.get(link)
+        logging.info(f'Scraping stats from {self._get_match_info(link)[5]}...')
         WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.XPATH, '//li[@data-tab-index="2"]'))).click()
         dict = self._create_dictionary(
             self._get_match_info(link),
             self._split_stats_list(self._get_match_info(link)[2])
             )
+        match_id = self._get_match_info(link)[5]
         if self.save_location == 'local':
-            self.save_data_locally(self._get_match_info(link)[5], dict)
+            self.save_data_locally(match_id, dict)
         elif self.save_location == 'rds':
-            self.save_data_aws(self._get_match_info(link)[5])
+            self.save_data_locally(match_id, dict)
+            self.save_data_aws(match_id)
+            path = f'/Users/asadiceccarelli/Documents/AiCore/Data-Collection-Pipeline/raw_data/{self.club}'
+            shutil.rmtree(path)
         elif self.save_location == 'both':
-            self.save_data_locally(self._get_match_info(link)[5], dict)
-            self.save_data_aws(self._get_match_info(link)[5])
+            self.save_data_locally(match_id, dict)
+            self.save_data_aws(match_id)
 
     def _display_graphs(self):
         '''Displays the graphs created in the CreateGraph class in the graph.py file.'''
-        print('Displaying graphs...')
-        CreateGraph(self.club, self.year).show_graphs()
+        logging.info('Displaying graphs...')
+        try:
+            CreateGraph(self.club, self.year).show_graphs()
+        except ValueError:
+            logging.error('Full match data is not available for seasons prior to 2006/07')
+            sys.exit()
 
     def run_crawler(self):
         '''Gets the list of 38 links to each fixture, goes through them one by one and extracts all the data required.'''
@@ -288,18 +302,23 @@ class PremierLeagueScraper:
             RDS.upload_to_sql(self.club, self.year)
             self._display_graphs()
             self.driver.quit()
-            print('Program successfully finished.')
+            logging.info('Program successfully finished.')
         else:
-            print('RDS database already contains data on this club from this season.')
+            logging.warning('RDS database already contains data on this club from this season.')
             self._display_graphs()
             self.driver.quit()
-            print('Program successfully finished.')
+            logging.info('Program successfully finished.')
     
 
 if __name__ == '__main__':
     options = Options()
-    options.headless = True
+    options.add_argument("--disable-gpu")
+    options.add_argument("--disable-extensions")
+    options.add_argument("--disable-infobars")
     options.add_argument('--window-size=1920,1080')
-    options.add_argument('--start-maximized')
-    premierleague = PremierLeagueScraper(driver=webdriver.Chrome(executable_path='/usr/local/bin/chromedriver', options=options))
+    options.add_argument("--disable-notifications")
+    options.add_argument('--headless')
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    premierleague = PremierLeagueScraper(driver=webdriver.Chrome(options=options))
     premierleague.run_crawler()
