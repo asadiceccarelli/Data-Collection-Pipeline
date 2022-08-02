@@ -37,20 +37,17 @@ class PremierLeagueScraper:
 
     def _user_inputs(self):
         '''Checks the inputs from the user are valid.'''
-        # self.club = input('Which club would you like to inspect? ').title()
-        # while self.club not in valid_inputs.valid_clubs().keys():
-        #     self.club = input(f'Please enter a valid club. You may need to enter a shortened version, e.g. \'Spurs\' or \'QPR\'. ').title()
+        self.club = input('Which club would you like to inspect? ').title()
+        while self.club not in valid_inputs.valid_clubs().keys():
+            self.club = input(f'Please enter a valid club. You may need to enter a shortened version, e.g. \'Spurs\' or \'QPR\'. ').title()
         
-        # self.year = input('Which season would you like to inspect? Enter in the format YYYY/YY. ')
-        # while self.year not in valid_inputs.valid_seasons():
-        #     self.year = input(f'Please enter a valid season, e.g. \'2011/12\'. ')
+        self.year = input('Which season would you like to inspect? Enter in the format YYYY/YY. ')
+        while self.year not in valid_inputs.valid_seasons():
+            self.year = input(f'Please enter a valid season, e.g. \'2011/12\'. ')
 
-        # self.save_location = input('Where would you like to save this data? Please enter \'local\', \'rds\' or \'both\'. ')
-        # while self.save_location not in ['local', 'rds', 'both']:
-        #     self.save_location = input(f'Please enter \'local\', \'rds\' or \'both\'. ')
-        self.club = 'Chelsea'
-        self.year = '1995/96' 
-        self.save_location = 'both'
+        self.save_location = input('Where would you like to save this data? Please enter \'local\', \'rds\' or \'both\'. ')
+        while self.save_location not in ['local', 'rds', 'both']:
+            self.save_location = input(f'Please enter \'local\', \'rds\' or \'both\'. ')
     
     def _accept_cookies(self):
         '''Wait for window and accepts all cookies. Does nothing if no window.'''
