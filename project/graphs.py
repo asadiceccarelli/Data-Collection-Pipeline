@@ -224,8 +224,4 @@ class CreateGraph:
         self._shots_line()
         self._fouls_cards_twin()
         plt.show()
-
-
-if __name__ == '__main__':
-    PL = CreateGraph('Chelsea', '2021/22')
-    PL.show_graphs()
+        self.fig.savefig(f'/data-collection/graphical-data/{self.club} - {self.year[-5:]}.png')

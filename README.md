@@ -286,9 +286,14 @@ CMD ["python3", "project/scraper.py"]
 
 - Now, to build up the image ```docker build -t scraper:latest .``` is run from the CLI. This will build up a the image with the name ```scraper``` and the tag ```latest```.
 
-- To run the image interactively whilst keeping the STDIN open, ```docker run -it scraper``` is run from the CLI.
+- A ```Docker volume``` is created to allow data to persist after a container is exited by connecting a file system on the host operating system to a virtual file system in the container. This is done with ```docker volume create PL-volume```.
 
-- A ```Docker volume``` is created to allow data to persist after a container is exited by connecting a file system on the host operating system to a virtual file system in the container.
+- To run the image ```docker run -it --rm -v PL-volume:/data-collection/graphical-data scraper``` is run from the CLI.
+  - The ```-it``` flags run the image interactively whilst keeping the STDIN open.
+  - The ```--rm``` will remove the container after it has been exited.
+  - The ```-v``` tag binds a mount to a volume, in this case binding the mount created inside the ```graphical-data``` directory to ```PL-volume```.
+
+
 
 ## Milestone 8: Monitoring and alerting
 
