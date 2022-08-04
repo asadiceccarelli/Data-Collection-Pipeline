@@ -257,8 +257,8 @@ class PremierLeagueScraper:
         self._close_ad()
         self._select_season()
         self._scroll_to_bottom()
-        seasons_with_22 = ['1992/93', '1993/94', '1994/95']
-        if self.year in seasons_with_22:
+        seasons_with_22_teams = ['1992/93', '1993/94', '1994/95']
+        if self.year in seasons_with_22_teams:
             correct_no_fixtures = 42
         else:
             correct_no_fixtures = 38
