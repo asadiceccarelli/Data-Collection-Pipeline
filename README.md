@@ -20,6 +20,12 @@
     ```python
     logging.basicConfig(level = logging.INFO)
     ```
+
+- A requirements.txt file is set up with ```pip freeze``` formatted so only the package version is shown.
+```
+pip list --format=freeze > requirements.txt
+```
+
 <p align="center">
   <img 
     width="500"
@@ -230,11 +236,59 @@ def __init__(self, club, year):
 
 ## Milestone 7: Containerising the scraper and running it on a cloud server
 
-A final refactoring of the code has been completed, ensuring all aspects are as neat and efficient as possible.
+- ```Docker``` is used to containerise the program so that it can be run on any OS. This container holds the application and all dependencies in a single self-contained environment.
 
-CHECK TESTS ARE ALL STILL PASSING
+- To run a scraper in a docker container, it must first be able to complete all the necessary tasks in 'headless mode' i.e. without the GUI. 
+```python
+options = Options()
+    options.add_argument('--headless')
+    premierleague = PremierLeagueScraper(driver=webdriver.Chrome(options=options))
+```
 
-To run a scraper in a docker container, it must first be able to complete all the necessary tasks in 'headless mode' i.e. without the GUI. To do this, the options.headless = True
+- First, a ```Docker image```, which is the template for the container, is 'built' using a ```Dockerfile``.
+
+- The base image ```python:3.8-slim-buster``` is used which is a paired down version of the full image, meaning the image itself will take up less disk space.
+```python
+FROM python:3.8-slim-buster
+```
+
+- In order to run the scraper inside the container, both Google Chrome and Chromedriver must be installed inside the image.
+  - This is done by using ```wget``` for Chrome....
+  ```python
+  RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
+  RUN sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
+  RUN apt-get -y update
+  RUN apt-get install -y google-chrome-stable
+  ```
+
+  - And for Chromedriver.
+  ```python
+  RUN apt-get install -yqq unzip
+  RUN wget -O /tmp/chromedriver.zip http://chromedriver.storage.googleapis.com/`curl -sS chromedriver.storage.googleapis.com/LATEST_RELEASE`/chromedriver_linux64.zip
+  RUN unzip /tmp/chromedriver.zip chromedriver -d /usr/local/bin/
+  ```
+
+- ```pip``` is used to update itself to the latest version and install the required packages.
+```python
+RUN pip install --upgrade pip
+RUN pip install -r requirements.txt
+```
+
+- All files in the ```Data-Collection-Pipeline``` directory are copied into the image using the ```COPY``` command.
+```python
+COPY . .
+```
+
+- Finally to execute the program when the image is run, the ```CMD``` command is used.
+```python
+CMD ["python3", "project/scraper.py"]
+```
+
+- Now, to build up the image ```docker build -t scraper:latest .``` is run from the CLI. This will build up a the image with the name ```scraper``` and the tag ```latest```.
+
+- To run the image interactively whilst keeping the STDIN open, ```docker run -it scraper``` is run from the CLI.
+
+- A ```Docker volume``` is created to allow data to persist after a container is exited by connecting a file system on the host operating system to a virtual file system in the container.
 
 ## Milestone 8: Monitoring and alerting
 

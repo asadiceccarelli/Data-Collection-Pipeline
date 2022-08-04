@@ -4,7 +4,7 @@ import boto3
 import json
 import pandas as pd
 import numpy as np
-from project.valid_inputs import valid_clubs
+from valid_inputs import valid_clubs
 from sqlalchemy import create_engine, inspect
 
 logging.basicConfig(level = logging.INFO)
@@ -23,8 +23,13 @@ def rds_connect():
 
 def upload_to_sql(club, year):
     engine = rds_connect()
-    s3 = boto3.resource('s3')
-    my_bucket = s3.Bucket('premier-league-bucket')
+    s3_resource = boto3.resource(
+            's3',
+            region_name = 'eu-west-2',
+            aws_access_key_id = 'AKIAQVVBJ5HOBRYQLYIF',
+            aws_secret_access_key = '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'
+            )
+    my_bucket = s3_resource.Bucket('premier-league-bucket')
     
     logging.info('Creating data fram using pandas...')
     stats_dict_list = []
