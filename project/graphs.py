@@ -1,4 +1,4 @@
-from project.RDS import rds_connect
+from RDS import rds_connect
 import matplotlib.pyplot as plt
 import numpy as np
 from dateutil.relativedelta import relativedelta

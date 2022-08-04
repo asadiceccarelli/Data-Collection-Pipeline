@@ -5,10 +5,9 @@ import logging
 import uuid
 import json
 import boto3
-import shutil
-import project.RDS as RDS
-import project.valid_inputs as valid_inputs
-from project.graphs import CreateGraph
+import RDS
+import valid_inputs as valid_inputs
+from graphs import CreateGraph
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
@@ -37,17 +36,20 @@ class PremierLeagueScraper:
 
     def _user_inputs(self):
         '''Checks the inputs from the user are valid.'''
-        self.club = input('Which club would you like to inspect? ').title()
-        while self.club not in valid_inputs.valid_clubs().keys():
-            self.club = input(f'Please enter a valid club. You may need to enter a shortened version, e.g. \'Spurs\' or \'QPR\'. ').title()
+        # self.club = input('Which club would you like to inspect? ').title()
+        # while self.club not in valid_inputs.valid_clubs().keys():
+        #     self.club = input(f'Please enter a valid club. You may need to enter a shortened version, e.g. \'Spurs\' or \'QPR\'. ').title()
         
-        self.year = input('Which season would you like to inspect? Enter in the format YYYY/YY. ')
-        while self.year not in valid_inputs.valid_seasons():
-            self.year = input(f'Please enter a valid season, e.g. \'2011/12\'. ')
+        # self.year = input('Which season would you like to inspect? Enter in the format YYYY/YY. ')
+        # while self.year not in valid_inputs.valid_seasons():
+        #     self.year = input(f'Please enter a valid season, e.g. \'2011/12\'. ')
 
-        self.save_location = input('Where would you like to save this data? Please enter \'local\', \'rds\' or \'both\'. ')
-        while self.save_location not in ['local', 'rds', 'both']:
-            self.save_location = input(f'Please enter \'local\', \'rds\' or \'both\'. ')
+        # self.save_location = input('Where would you like to save this data? Please enter \'local\', \'rds\' or \'both\'. ')
+        # while self.save_location not in ['local', 'rds', 'both']:
+        #     self.save_location = input(f'Please enter \'local\', \'rds\' or \'both\'. ')
+        self.club = 'Man City'
+        self.year = '2018/19'
+        self.save_location = 'rds'
     
     def _accept_cookies(self):
         '''Wait for window and accepts all cookies. Does nothing if no window.'''
@@ -116,7 +118,7 @@ class PremierLeagueScraper:
             logging.error(f'{len(link_list)} fixtures in list. There should be {correct_no_fixtures}.')
             self.driver.refresh()
             self._close_ad()
-            WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, 'div[class="fixtures__matches-list"]')))
+            WebDriverWait(self.driver, 10).until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'div[class="fixtures__matches-list"]')))
             self._scroll_to_bottom()
             return link_list
     
@@ -127,6 +129,7 @@ class PremierLeagueScraper:
         Returns:
             list: Date in datetime format (%a %d %b %Y) as a string, stadium as a string, stats_list as a list.
         '''
+        WebDriverWait(self.driver, 10).until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'div[class^="matchDate renderMatchDateContainer"]')))
         date_str = self.driver.find_element(By.CSS_SELECTOR, 'div[class^="matchDate renderMatchDateContainer"]').text
         stadium = self.driver.find_element(By.CSS_SELECTOR, 'div[class="stadium"]').text
 
@@ -134,6 +137,7 @@ class PremierLeagueScraper:
         stats_list = stats_table.find_elements(By.TAG_NAME, 'tr')
         info = [date_str, stadium, stats_list]
 
+        WebDriverWait(self.driver, 10).until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'div[class="scoreboxContainer"]')))
         score_container = self.driver.find_element(By.CSS_SELECTOR, 'div[class="scoreboxContainer"]')
         home_container = score_container.find_element(By.CSS_SELECTOR, 'div[class="team home"]')
         home_team_short = home_container.find_element(By.CSS_SELECTOR, 'span[class="short"]').get_attribute('textContent')  # get_attribute as element is not visible
@@ -231,14 +235,20 @@ class PremierLeagueScraper:
             outfile.write(json_str)    
         logging.info(f'{match_id} saved locally.')  
 
-    def save_data_aws(self, match_id):
+    def save_data_aws(self, match_id, raw_stats):
         '''
         Saves the dictionary of information in an AWS S3 bucket in the cloud, named after the match ID.
         Args:
             match_id (int): The unique ID of each match.
         '''
-        s3_client = boto3.client('s3')
-        s3_client.upload_file(f'raw_data/{self.club}/{match_id}/data.json', 'premier-league-bucket', match_id)
+        s3_client = boto3.client(
+            's3',
+            region_name = 'eu-west-2',
+            aws_access_key_id = 'AKIAQVVBJ5HOBRYQLYIF',
+            aws_secret_access_key = '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'
+            )
+        json_str = json.dumps(raw_stats)
+        s3_client.put_object(Bucket='premier-league-bucket', Key=match_id, Body=(bytes(json_str, encoding='utf-8')))
         logging.info(f'{match_id} saved to AWS S3 bucket.')
 
     def _scrape_links(self):
@@ -247,7 +257,6 @@ class PremierLeagueScraper:
         self._close_ad()
         self._select_season()
         self._scroll_to_bottom()
-        logging.info('Extracting and saving information for each match...')
         seasons_with_22 = ['1992/93', '1993/94', '1994/95']
         if self.year in seasons_with_22:
             correct_no_fixtures = 42
@@ -272,13 +281,10 @@ class PremierLeagueScraper:
         if self.save_location == 'local':
             self.save_data_locally(match_id, dict)
         elif self.save_location == 'rds':
-            self.save_data_locally(match_id, dict)
-            self.save_data_aws(match_id)
-            path = f'/Users/asadiceccarelli/Documents/AiCore/Data-Collection-Pipeline/raw_data/{self.club}'
-            shutil.rmtree(path)
+            self.save_data_aws(match_id, dict)
         elif self.save_location == 'both':
             self.save_data_locally(match_id, dict)
-            self.save_data_aws(match_id)
+            self.save_data_aws(match_id, dict)
 
     def _display_graphs(self):
         '''Displays the graphs created in the CreateGraph class in the graph.py file.'''

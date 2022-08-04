@@ -1,8 +1,8 @@
 import unittest
 from numpy import place
 from selenium import webdriver
-from project.scraper import PremierLeagueScraper
-from project.RDS import upload_to_sql
+from scraper import PremierLeagueScraper
+from RDS import upload_to_sql
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -22,7 +22,7 @@ class PremierLeagueScraperTestCase(unittest.TestCase):
         self.options.add_argument('--disable-dev-shm-usage')
         self.pl = PremierLeagueScraper(driver=webdriver.Chrome(options=self.options))
         self.pl.club = 'Chelsea'  # Test
-        self.pl.year = '1999/00'
+        self.pl.year = '2021/22'
 
     def test_select_season(self):
         '''Tests that the correct season has been selected from the dropdown menu.'''
@@ -53,7 +53,7 @@ class PremierLeagueScraperTestCase(unittest.TestCase):
         self.pl._accept_cookies()
         self.pl._select_season()
         self.pl._scroll_to_bottom()
-        link_list = self.pl._get_fixture_link_list()
+        link_list = self.pl._get_fixture_link_list(38)
         self.assertEqual(len(link_list), 38)
 
     def test_split_stats_list(self):
