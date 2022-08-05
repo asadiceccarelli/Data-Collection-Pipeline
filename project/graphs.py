@@ -1,3 +1,4 @@
+from valid_inputs import valid_clubs
 from RDS import rds_connect
 import matplotlib.pyplot as plt
 import numpy as np
@@ -224,4 +225,4 @@ class CreateGraph:
         self._shots_line()
         self._fouls_cards_twin()
         plt.show()
-        self.fig.savefig(f'/data-collection/graphical-data/{self.club} - {self.year[-5:]}.png')
+        self.fig.savefig(f'graphical-data/{valid_clubs()[self.club]}-{self.year[-2:]}.png')
