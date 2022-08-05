@@ -236,7 +236,7 @@ def __init__(self, club, year):
 
 ## Milestone 7: Containerising the scraper and running it on a cloud server
 
-- ```Docker``` is used to containerise the program so that it can be run on any OS. This container holds the application and all dependencies in a single self-contained environment.
+- Docker is used to containerise the program so that it can be run on any OS. This container holds the application and all dependencies in a single self-contained environment.
 
 - To run a scraper in a docker container, it must first be able to complete all the necessary tasks in 'headless mode' i.e. without the GUI. 
 ```python
@@ -245,7 +245,7 @@ options = Options()
     premierleague = PremierLeagueScraper(driver=webdriver.Chrome(options=options))
 ```
 
-- First, a ```Docker image```, which is the template for the container, is 'built' using a ```Dockerfile``.
+- First, a Docker image, which is the template for the container, is 'built' using a ```Dockerfile``.
 
 - The base image ```python:3.8-slim-buster``` is used which is a paired down version of the full image, meaning the image itself will take up less disk space.
 ```python
@@ -286,13 +286,24 @@ CMD ["python3", "project/scraper.py"]
 
 - Now, to build up the image ```docker build -t scraper:latest .``` is run from the CLI. This will build up a the image with the name ```scraper``` and the tag ```latest```.
 
-- A ```Docker volume``` is created to allow data to persist after a container is exited by connecting a file system on the host operating system to a virtual file system in the container. This is done with ```docker volume create PL-volume```.
+- A ```Docker volume``` is created to allow data to persist after a container is exited by connecting a file system on the host operating system to a virtual file system in the container. This is done with ```docker volume create PL-graphical-data```. Using this, the user can save the graphs onto their local machine after the container has run.
 
-- To run the image ```docker run -it --rm -v PL-volume:/data-collection/graphical-data scraper``` is run from the CLI.
+- A ```.env``` file is set up to securely store our environment variables which will the user can alter.
+```
+club=Man Utd
+season=1994/95
+rds_password=********
+aws_access_key_id=***********
+aws_secret_access_key=****************
+```
+
+- To run the image ```docker run -it --rm -v test-volume:/data-collection/graphical-data --env-file ./.env scraper``` is run from the CLI.
   - The ```-it``` flags run the image interactively whilst keeping the STDIN open.
   - The ```--rm``` will remove the container after it has been exited.
   - The ```-v``` tag binds a mount to a volume, in this case binding the mount created inside the ```graphical-data``` directory to ```PL-volume```.
+  - The ```--env-file``` tag indicates where to find the list of environment variables.
 
+  - The ```premier-league-scraper``` image is then pushed to Dockerhub.
 
 
 ## Milestone 8: Monitoring and alerting
