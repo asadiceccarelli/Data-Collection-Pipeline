@@ -1,3 +1,4 @@
+import os
 from datetime import date
 import logging
 import boto3
@@ -15,7 +16,7 @@ def rds_connect():
     DBAPI = 'psycopg2'
     HOST = 'aicore-db.ckoq1wsuhqob.us-east-1.rds.amazonaws.com'
     USER = 'postgres'
-    PASSWORD = 'Ne0ntetras'
+    PASSWORD = os.environ['rds_password']
     DATABASE = 'data-pipeline-project'
     PORT = 5432
     return create_engine(f"{DATABASE_TYPE}+{DBAPI}://{USER}:{PASSWORD}@{HOST}:{PORT}/{DATABASE}")
@@ -26,8 +27,8 @@ def upload_to_sql(club, year):
     s3_resource = boto3.resource(
             's3',
             region_name = 'eu-west-2',
-            aws_access_key_id = 'AKIAQVVBJ5HOBRYQLYIF',
-            aws_secret_access_key = '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'
+            aws_access_key_id = os.environ['aws_access_key_id'],
+            aws_secret_access_key = os.environ['aws_secret_access_key']   
             )
     my_bucket = s3_resource.Bucket('premier-league-bucket')
     
