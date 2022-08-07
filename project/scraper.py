@@ -64,8 +64,6 @@ class PremierLeagueScraper:
         self._close_ad()
         WebDriverWait(self.driver, 10).until(EC.visibility_of_element_located((By.CSS_SELECTOR,
             '[aria-labelledby="dd-compSeasons"][role="button"]'))).click()
-        # desired_season = self.driver.find_element(By. XPATH,
-        #     f'//*[@id="mainContent"]/div[3]/div[1]/section/div[3]/ul/li[{valid_inputs.valid_seasons()[self.year]}]')
         desired_season = self.driver.find_element(By. XPATH,
             f'//*[@id="mainContent"]/div[3]/div[1]/section/div[3]/ul/li[contains(text(),"{self.year}")]')
         actions = ActionChains(self.driver)
