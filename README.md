@@ -234,7 +234,7 @@ def __init__(self, club, year):
 
 > The program outputs all the graphs on one page using ```GridSpec```.
 
-## Milestone 7: Containerising the scraper and running it on a cloud server
+## Milestone 7.1: Containerising the scraper
 
 - Docker is used to containerise the program so that it can be run on any OS. This container holds the application and all dependencies in a single self-contained environment.
 
@@ -297,13 +297,54 @@ aws_access_key_id=***********
 aws_secret_access_key=****************
 ```
 
-- To run the image ```docker run -it --rm -v test-volume:/data-collection/graphical-data --env-file ./.env scraper``` is run from the CLI.
+- To run the image ```docker run -it --rm -v premier-league-volume:/data-collection/graphical-data --env-file ./.env premier-league-scraper:v1``` is run from the CLI.
   - The ```-it``` flags run the image interactively whilst keeping the STDIN open.
   - The ```--rm``` will remove the container after it has been exited.
   - The ```-v``` tag binds a mount to a volume, in this case binding the mount created inside the ```graphical-data``` directory to ```PL-volume```.
   - The ```--env-file``` tag indicates where to find the list of environment variables.
 
   - The ```premier-league-scraper``` image is then pushed to Dockerhub.
+
+## Milestone 7.2: Running the scraper on a cloud computer
+
+- An Elastic Cloud Computing (EC2) instance is set up using AWS to run the program on what is essentially a remote computer.
+
+- First a key-pair is set up with a ```.pem``` extention and it's mode altered to read-only permission from the terminal.
+```
+chmod 400 <key-pair-name>.pem
+```
+
+- An security group is then created for the EC2 instance with the inbound rules:
+  - HTTP: Anywhere IPv4
+  - HTTPS: Anywhere IPv4
+  - SSH: My IP
+
+- This instance will utilise the ```Amazon Linux 2 AMI``` Amazon Machine Image (AMI) and the ```t2-micro``` instance type. The instance is then connected to with the command:
+```
+ssh -i <key-pair-name>.pem ec2-user@<public-dns>
+```
+
+Finally, the ```Data-Collection-Pipeline``` directory is copied to the EC2 instance.
+```
+scp -i </path/key-pair-name.pem> </path/DataCollection-Pipeline> ec2-user@<public-dns>:<path/>
+```
+
+- Dockker is then installed in this instance and the ```ec2-user``` is added to the ```docker``` group so that commands can be executed without the neeed for ```sudo```.
+```
+sudo yum update -y
+sudo amazon-linux-extras install docker
+sudo service docker start
+sudo systemctl enable docker
+sudo usermod -a -G docker ec2-user
+```
+
+- The ```premier-league-scraper``` image is then pulled from Dockerhub before being run again to ensure it successfully works within this EC2 instance.
+```
+docker run -it --rm -v premier-league-volume:/data-collection/graphical-data --env-file ./.env asadiceccarelli/premier-league-scraper:v1
+```
+
+- The graphical data is saved in the Docker volume ```premier-league-volume``` in the EC2 instance.
+
 
 
 ## Milestone 8: Monitoring and alerting
