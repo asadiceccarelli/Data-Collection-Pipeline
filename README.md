@@ -297,7 +297,13 @@ aws_access_key_id=***********
 aws_secret_access_key=****************
 ```
 
-- To run the image ```docker run -it --rm -v premier-league-volume:/data-collection/graphical-data --env-file ./.env premier-league-scraper:v1``` is run from the CLI.
+- The image is run directly from the CLI.
+```
+docker run -it --rm \
+-v premier-league-volume:/data-collection/graphical-data \
+--env-file ./.env \
+asadiceccarelli/premier-league-scraper:v1
+```
   - The ```-it``` flags run the image interactively whilst keeping the STDIN open.
   - The ```--rm``` will remove the container after it has been exited.
   - The ```-v``` tag binds a mount to a volume, in this case binding the mount created inside the ```graphical-data``` directory to ```PL-volume```.
@@ -311,7 +317,7 @@ aws_secret_access_key=****************
 
 - First a key-pair is set up with a ```.pem``` extention and it's mode altered to read-only permission from the terminal.
 ```
-chmod 400 <key-pair-name>.pem
+chmod 400 /Users/asadiceccarelli/Documents/AiCore/aicorekey.pem
 ```
 
 - An security group is then created for the EC2 instance with the inbound rules:
@@ -321,12 +327,12 @@ chmod 400 <key-pair-name>.pem
 
 - This instance will utilise the ```Amazon Linux 2 AMI``` Amazon Machine Image (AMI) and the ```t2-micro``` instance type. The instance is then connected to with the command:
 ```
-ssh -i <key-pair-name>.pem ec2-user@<public-dns>
+ssh -i /Users/asadiceccarelli/Documents/AiCore/aicorekey.pem ec2-user@<public-dns>
 ```
 
 Finally, the ```Data-Collection-Pipeline``` directory is copied to the EC2 instance.
 ```
-scp -i </path/key-pair-name.pem> </path/DataCollection-Pipeline> ec2-user@<public-dns>:<path/>
+scp -i /Users/asadiceccarelli/Documents/AiCore/aicorekey.pem -r </path/DataCollection-Pipeline> ec2-user@<public-dns>:~/
 ```
 
 - Dockker is then installed in this instance and the ```ec2-user``` is added to the ```docker``` group so that commands can be executed without the neeed for ```sudo```.
@@ -346,7 +352,69 @@ docker run -it --rm -v premier-league-volume:/data-collection/graphical-data --e
 - The graphical data is saved in the Docker volume ```premier-league-volume``` in the EC2 instance.
 
 
-
 ## Milestone 8: Monitoring and alerting
+
+- First the Prometheus image is pulled from Dockerhub using ```docker pull prom/prometheus```. Then the image is run using a ```prometheus.yml``` file.
+
+```
+docker run --rm -d \
+    --network=host \
+    --name prometheus\
+    -v /home/ec2-user/Data-Collection-Pipeline/prometheus.yml:/etc/prometheus/prometheus.yml \
+    prom/prometheus \
+    --config.file=/etc/prometheus/prometheus.yml \
+    --web.enable-lifecycle 
+```
+
+- To get Prometheus to track Docker, Docker's configuration is edited to that Prometheus knows from which address to collect the metrics. This is done by editing the ```daemon.json``` file. The IP address corresponding to Docker can be found by running ```ifconfig -a```.
+
+<p align="center">
+  <img 
+    width="500"
+    src="README_images/docker-inet.png"
+  >
+</p>
+
+> The IP address is found from ```inet``` under ```docker0```.
+
+```
+{
+    "metrics-addr" : "172.17.0.1:9323",
+    "experimental": true,
+    "features": {
+    "buildkit": true
+    }
+}
+```
+> The ```daemon.json``` file should look like this.
+
+- ```Node exporter``` is a single static binary that is downloaded and run straight from the workstation and allows us to track metrics from our local OS system.
+```
+wget https://github.com/prometheus/node_exporter/releases/download/v1.1.2/node_exporter-1.1.2.linux-amd64.tar.gz
+tar xvfz node_exporter-1.1.2.linux-amd64.tar.gz
+rm node_exporter-1.1.2.linux-amd64.tar.gz
+```
+
+- This is run using ```./node_exporter-1.1.2.linux-amd64/node_exporter```.
+
+- Using these three endpoints as points to scrape (```Prometheus```, ```Docker``` and ```Node```), these image are run in detached mode (```-d``` flag) and their metrics displayed at ```<ec2 public IP>:9090```. However, to visualise them in a more user-friendly manner, Grafana will be used.
+
+- Setting up Grafana required very few steps using ```homebrew```. Grafana can then be accessed at ```localhost:3000```.
+```
+brew update
+brew install grafana
+brew services start grafana
+```
+
+- When adding Prometheus as a data source, the URL used is ```<ec2 public IP>:9090```.
+
+<p align="center">
+  <img 
+    width="1000"
+    src="README_images/grafana.png"
+  >
+</p>
+
+> The metrics collected from running the ```premier-league-scraper``` image once for one club.
 
 ## Milestone 9: Setting up a CI/CD pipeline for the docker image
