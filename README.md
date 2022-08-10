@@ -418,3 +418,55 @@ brew services start grafana
 > The metrics collected from running the ```premier-league-scraper``` image once for one club.
 
 ## Milestone 9: Setting up a CI/CD pipeline for the docker image
+
+- Continuous Integreation (CI) is a way of integrating software changes from multiple contributors. This consists of:
+  - Accessing code quality (code assessments and/or reviews).
+  - Accessing adherence to the project's best practices.
+
+- Continuous Deployment/Delivery (CD) involves testing that production code is always tested/bug-free and ready to be deployed automatically. This consists of:
+  - Checking chanegs against integration tests.
+  - Testing every feature that is supposed to be merged.
+  - N.B. Continuous Delivery approach may not be suitable for all projects.
+
+- Github Actions aid in creating a CI/CD pipeline as it enables the creation of workflows that can perform a certain action every time a designated event occurs. Here, a simple worflow has been created to build and push the updated Docker image wehenever there is a push to the ```main``` branch of the repository.
+
+- First, my Docker ID, ```asadiceccarelli``` and a newly generated Personal Access Token (PAT) was added as an encrypted environment secret in GitHub.
+
+- Then, the workflow was set up in the ```github_registry.yml``` as follows.
+```yml
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      -
+        name: Checkout 
+        uses: actions/checkout@v2
+      -
+        name: Login to Docker Hub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      -
+        name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKER_HUB_USERNAME }}/premier-league-scraper:latest
+```
+
+- This was confirmed to work after commiting this file to the ```main``` branch, and checking Dockerhub to see the latest version of the image ```premier-league-scraper``` pushed.
+
+- A CronJob creates a Job which can be scheduled to run on a repeating schedule. Whilst this coudl be set up to run on the EC2 instance, and would be useful to many data scraping projects, it does not make much sense this feature to be included here. This is because the data for each season is only updated on a yearly bases, unlike most other data scraping programs which scrape from sites uploaded new products/data on almost a daily basis.
