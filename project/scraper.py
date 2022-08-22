@@ -220,9 +220,7 @@ class PremierLeagueScraper:
             's3',
             region_name = 'eu-west-2',
             aws_access_key_id = os.environ['aws_access_key_id'],
-            aws_secret_access_key = os.environ['aws_secret_access_key']
-            # aws_access_key_id='AKIAQVVBJ5HOBRYQLYIF',
-            # aws_secret_access_key='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'            
+            aws_secret_access_key = os.environ['aws_secret_access_key']          
             )
         json_str = json.dumps(raw_stats)
         s3_client.put_object(Bucket='premier-league-bucket', Key=match_id, Body=(bytes(json_str, encoding='utf-8')))
